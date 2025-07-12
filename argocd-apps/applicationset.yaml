@@ -1,0 +1,31 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: hello-argo-multi-env
+  namespace: argocd
+spec:
+  generators:
+    - list:
+        elements:
+          - name: test
+            path: k8s/overlays/test
+            namespace: hello-test
+          - name: prod
+            path: k8s/overlays/prod
+            namespace: hello-prod
+  template:
+    metadata:
+      name: hello-argo-{{name}}
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/shuraosipov/hello-argo.git
+        targetRevision: HEAD
+        path: "{{path}}"
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: "{{namespace}}"
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
