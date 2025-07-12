@@ -13,7 +13,7 @@ spec:
         app: hello-argo
     spec:
       containers:
-      - name: web
+      - name: hello-argo
         image: shuraosipov/hello-argo:latest
         ports:
         - containerPort: 8080
