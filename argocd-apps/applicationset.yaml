@@ -10,9 +10,11 @@ spec:
           - name: test
             path: k8s/overlays/test
             namespace: hello-test
+            revision: dev
           - name: prod
             path: k8s/overlays/prod
             namespace: hello-prod
+            revision: main
   template:
     metadata:
       name: hello-argo-{{name}}
@@ -20,7 +22,7 @@ spec:
       project: default
       source:
         repoURL: https://github.com/shuraosipov/hello-argo.git
-        targetRevision: HEAD
+        targetRevision: "{{revision}}"
         path: "{{path}}"
       destination:
         server: https://kubernetes.default.svc
