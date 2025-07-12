@@ -4,7 +4,7 @@ This project demonstrates how to build a simple Python web app, containerize it,
 
 ---
 
-## 📦 Stack
+## 📆 Stack
 
 * Python 3
 * Docker + Docker Hub
@@ -14,23 +14,26 @@ This project demonstrates how to build a simple Python web app, containerize it,
 
 ---
 
-## 🧰 Prerequisites
+## 🛠️ Prerequisites
 
 Ensure the following are installed:
 
 * [Docker Desktop for Mac](https://www.docker.com/products/docker-desktop/)
 
   * Enable Kubernetes in Docker Desktop → Settings → Kubernetes
+
 * [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/)
 
   ```bash
   brew install kubectl
   ```
+
 * [Argo CD CLI](https://argo-cd.readthedocs.io/en/stable/cli_installation/)
 
   ```bash
   brew install argocd
   ```
+
 * [Git](https://git-scm.com/)
 
 ---
@@ -86,7 +89,7 @@ Hello from ArgoCD!
 
 ---
 
-## 🐳 Step 2: Push Docker Image to Docker Hub
+## 🚢 Step 2: Push Docker Image to Docker Hub
 
 ### 1. Login to Docker Hub
 
@@ -110,9 +113,28 @@ docker push yourusername/hello-argo:latest
 
 ## 📁 Step 3: Prepare Kubernetes Manifests
 
-### Create `k8s/` folder with:
+This project uses **Kustomize overlays** to manage multiple environments (`test`, `prod`) while reusing a shared `base`.
 
-#### `k8s/deployment.yaml`
+### Folder Structure
+
+```
+k8s/
+├── base/
+│   ├── deployment.yaml
+│   ├── service.yaml
+│   └── kustomization.yaml
+└── overlays/
+    ├── test/
+    │   ├── kustomization.yaml
+    │   ├── image-tag.yaml
+    │   └── replica-count.yaml
+    └── prod/
+        ├── kustomization.yaml
+        ├── image-tag.yaml
+        └── replica-count.yaml
+```
+
+### `k8s/base/deployment.yaml`
 
 ```yaml
 apiVersion: apps/v1
@@ -130,13 +152,13 @@ spec:
         app: hello-argo
     spec:
       containers:
-        - name: web
+        - name: hello-argo
           image: yourusername/hello-argo:latest
           ports:
             - containerPort: 8080
 ```
 
-#### `k8s/service.yaml`
+### `k8s/base/service.yaml`
 
 ```yaml
 apiVersion: v1
@@ -151,6 +173,57 @@ spec:
       port: 80
       targetPort: 8080
   type: NodePort
+```
+
+### `k8s/base/kustomization.yaml`
+
+```yaml
+resources:
+  - deployment.yaml
+  - service.yaml
+```
+
+### Example `k8s/overlays/test/kustomization.yaml`
+
+```yaml
+resources:
+  - ../../base
+patchesStrategicMerge:
+  - image-tag.yaml
+  - replica-count.yaml
+```
+
+**`image-tag.yaml` (test):**
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hello-argo
+spec:
+  template:
+    spec:
+      containers:
+        - name: hello-argo
+          image: yourusername/hello-argo:test
+```
+
+**`replica-count.yaml` (test):**
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hello-argo
+spec:
+  replicas: 1
+```
+
+### `prod` overlay is similar but uses different image/tag or replica count:
+
+```yaml
+image: yourusername/hello-argo:latest
+replicas: 3
 ```
 
 ---
@@ -202,66 +275,68 @@ argocd account update-password
 
 ## 📱 Step 6: Deploy App with Argo CD
 
-### 1. Create Argo CD Application
+### 1. Apply the ApplicationSet
+
+If you're using the included `argocd-apps/applicationset.yaml`, run:
 
 ```bash
-argocd app create hello-argo \
-  --repo https://github.com/YOUR_USERNAME/hello-argo.git \
-  --path k8s \
-  --dest-server https://kubernetes.default.svc \
-  --dest-namespace default
+kubectl apply -f argocd-apps/applicationset.yaml -n argocd
 ```
 
-### 2. Sync the app
+This will automatically create two Argo CD Applications:
+
+* `hello-argo-test` → uses `k8s/overlays/test`
+* `hello-argo-prod` → uses `k8s/overlays/prod`
+
+### 2. Sync the apps
 
 ```bash
-argocd app sync hello-argo
+argocd app sync hello-argo-test
+argocd app sync hello-argo-prod
 ```
 
 ### 3. Check the app status
 
 ```bash
-argocd app get hello-argo
+argocd app get hello-argo-test
+argocd app get hello-argo-prod
 ```
+![alt text](image.png)
 
 ---
 
 ## ✅ Access the App
 
 ```bash
-kubectl get svc
+kubectl get svc -n hello-test
+kubectl get svc -n hello-prod
 ```
 
-Find the `NodePort` assigned to `hello-argo`, then visit:
+Then port-forward to access them locally:
 
-```
-http://localhost:<nodePort>
+```bash
+kubectl port-forward svc/hello-argo -n hello-test 8081:80
+kubectl port-forward svc/hello-argo -n hello-prod 8082:80
 ```
 
-You should see: `Hello from ArgoCD!`
+Visit:
+
+* [http://localhost:8081](http://localhost:8081) → Test
+* [http://localhost:8082](http://localhost:8082) → Prod
 
 ---
 
 ## 🔄 Optional: Enable Auto-Sync
 
 ```bash
-argocd app set hello-argo --sync-policy automated
+argocd app set hello-argo-test --sync-policy automated
+argocd app set hello-argo-prod --sync-policy automated
 ```
 
 ---
 
-## 🧪 Bonus: Clean Up
-
-```bash
-argocd app delete hello-argo
-kubectl delete namespace argocd
-```
-
----
-
-## 📘 References
+## 📘️ References
 
 * [Argo CD Docs](https://argo-cd.readthedocs.io/)
 * [Kubernetes Docs](https://kubernetes.io/docs/)
 * [Docker Docs](https://docs.docker.com/)
-
