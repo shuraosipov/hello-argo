@@ -1,19 +1,19 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: hello-argo
+  name: hello-argocd
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: hello-argo
+      app: hello-argocd
   template:
     metadata:
       labels:
-        app: hello-argo
+        app: hello-argocd
     spec:
       containers:
-      - name: hello-argo
+      - name: hello-argocd
         image: shuraosipov/hello-argo:latest
         ports:
         - containerPort: 8080
